@@ -42,6 +42,15 @@ def is_target(target, list_y):
             list_t.append(0)
     return list_t
 
+def error(linear_svm, list_x, list_y):
+    error = 0
+    for ii in range(len(list_x)):
+        array_x = np.array(list_x[ii]).reshape(-1, len(list_x[ii]))
+        y_hat = linear_svm.predict(array_x)
+        if y_hat != list_y[ii]:
+            error += 1
+    return round(error/len(list_y), 5)
+
 def main():
     # Q1 - Q3
 #    list_x = [[1, 0], [0, 1], [0, -1], [-1, 0], [0, 2], [0, -2], [-2, 0]]
@@ -95,26 +104,29 @@ def main():
 #    print("coef_x2_2 = {}".format(coef_x2_2))
 
     # Q13 - Q16
-    file_data = "features.train"
-    list_x_train, list_y_train = XY(file_data)
-    file_data = "features.test"
-    list_x_test, list_y_test = XY(file_data)
-    x_train, x_val, y_train, y_val =  train_test_split(list_x_train, list_y_train, test_size = 0.2)
+    file_data = "hw1_features.train"
+    x_train, y_train = XY(file_data)
+    file_data = "hw1_features.test"
+    x_test, y_test = XY(file_data)
 
-    #Q13
+    # Q13
     target = 2
     y_train = is_target(target, y_train)
-    y_val = is_target(target, y_val)
-    y_test = is_target(target, list_y_test)
-
+    y_test = is_target(target, y_test)
     list_C = [10**-5, 10**-3, 10**-1, 10**1, 10**3]
     list_norm_w = []
     for cc in list_C:
-        print(cc)
-        linear_svm = LinearSVC(C=cc)
+        linear_svm = LinearSVC(C=cc, max_iter=100000)
         linear_svm.fit(x_train, y_train)
-        array_w = np.append(linear_svm.coef_, linear_svm.intercept_)
-        list_norm_w.append(np.linalg.norm(array_w))
+        Ein = error(linear_svm, x_train, y_train)
+        Eout = error(linear_svm, x_test, y_test)
+        array_w = np.round(linear_svm.coef_, 5)
+        list_norm_w.append(round(np.linalg.norm(array_w), 5))
+        print("C = {}: ||w|| = {}, Ein = {}, Eout = {}".format(cc, list_norm_w[-1], Ein, Eout))
+    plt.xscale("log")
+    plt.xlim(left=list_C[0], right=list_C[-1])
+    plt.xlabel("logC")
+    plt.ylabel("||w||")
     plt.plot(list_C, list_norm_w)
 
 #    kf = KFold(n_splits=5, random_state=123)
@@ -122,8 +134,7 @@ def main():
 #        print("Train: {}, Validate: {}".format(index_train, index_val))
 
 
-
-
+#    x_train, x_val, y_train, y_val =  train_test_split(x_train, y_train, test_size = 0.2)
 
     
     return
