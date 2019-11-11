@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 import matplotlib.pyplot as plt
 from sklearn.svm import SVC
-from sklearn.svm import LinearSVC
-from sklearn.model_selection import KFold
-from sklearn.model_selection import train_test_split
+#from sklearn.svm import LinearSVC
+#from sklearn.model_selection import KFold
+#from sklearn.model_selection import train_test_split
 import numpy as np
 
-def plot_decision_region(X, y, classifier, resolution = 0.02):
+def plot_decision_region(X, y, classifier):
     markers = ('x', 'o')
     colors = ("green", "red")
-    x1_min, x1_max = X[:, 0].min() - 1, X[:, 0].max() + 1
-    x2_min, x2_max = X[:, 1].min() - 1, X[:, 1].max() + 1
-    xx1, xx2 = np.meshgrid(np.arange(x1_min, x1_max, resolution), np.arange(x2_min, x2_max, resolution))
+    x1_min = X[:, 0].min()-1
+    x1_max = X[:, 0].max()+1
+    x2_min = X[:, 1].min()-1
+    x2_max = X[:, 1].max()+1
+    xx1, xx2 = np.meshgrid(np.arange(x1_min, x1_max, (x1_max-x1_min)/1000), np.arange(x2_min, x2_max, (x2_max-x2_min)/1000))
     Z = classifier.predict(np.array([xx1.ravel(), xx2.ravel()]).T)
     Z = Z.reshape(xx1.shape)
     plt.contourf(xx1, xx2, Z, alpha = 0.3)
@@ -22,7 +24,7 @@ def plot_decision_region(X, y, classifier, resolution = 0.02):
     plt.legend()
     return
 
-def XY(file_data):
+def get_XY(file_data, target):
     list_x = []
     list_y = []
     with open(file_data, 'r') as fr:
@@ -30,26 +32,17 @@ def XY(file_data):
         for line in list_lines:
             list_data = (line.strip()).split()
             list_x.append([float(list_data[1]), float(list_data[2])])
-            list_y.append(int(float(list_data[0])))
-    return list_x, list_y
+            if target == int(float(list_data[0])):
+                list_y.append(1)
+            else:
+                list_y.append(0)
+    return np.array(list_x), np.array(list_y)
 
-def is_target(target, list_y):
-    list_t = []
-    for y in list_y:
-        if y == target:
-            list_t.append(1)
-        else:
-            list_t.append(0)
-    return list_t
-
-def error(linear_svm, list_x, list_y):
+def error(svm, x, y):
     error = 0
-    for ii in range(len(list_x)):
-        array_x = np.array(list_x[ii]).reshape(-1, len(list_x[ii]))
-        y_hat = linear_svm.predict(array_x)
-        if y_hat != list_y[ii]:
-            error += 1
-    return round(error/len(list_y), 5)
+    y_hat = svm.predict(x)
+    error = y_hat[y_hat != y].size/y.shape[0]
+    return round(error, 5)
 
 def main():
     # Q1 - Q3
@@ -105,29 +98,76 @@ def main():
 
     # Q13 - Q16
     file_data = "hw1_features.train"
-    x_train, y_train = XY(file_data)
     file_data = "hw1_features.test"
-    x_test, y_test = XY(file_data)
 
     # Q13
-    target = 2
-    y_train = is_target(target, y_train)
-    y_test = is_target(target, y_test)
-    list_C = [10**-5, 10**-3, 10**-1, 10**1, 10**3]
-    list_norm_w = []
+#    target = 2
+#    x_train, y_train = get_XY(file_data, target)
+#    x_test, y_test = get_XY(file_data, target)
+#    list_C = [10**-5, 10**-3, 10**-1, 10**1, 10**3]
+#    list_norm_w = []
+#    for cc in list_C:
+#        linear_svm = SVC(kernel="linear", C=cc, max_iter=100000000)
+#        linear_svm.fit(x_train, y_train)
+#        Ein = error(linear_svm, x_train, y_train)
+#        Eout = error(linear_svm, x_test, y_test)
+#        array_w = np.round(linear_svm.coef_, 5)
+#        list_norm_w.append(round(np.linalg.norm(array_w), 5))
+#        plot_decision_region(np.array(x_train), np.array(y_train), linear_svm)
+#        print("C = {}: ||w|| = {}, Ein = {}, Eout = {}".format(cc, list_norm_w[-1], Ein, Eout))
+#        print("w = {}, b = {}".format(linear_svm.coef_, linear_svm.intercept_))
+#    plt.xscale("log")
+#    plt.xlim(left=list_C[0], right=list_C[-1])
+#    plt.xlabel("logC")
+#    plt.ylabel("||w||")
+#    plt.plot(list_C, list_norm_w)
+
+    # Q14
+#    target = 4
+#    x_train, y_train = get_XY(file_data, target)
+#    x_test, y_test = get_XY(file_data, target)
+#    list_C = [10**-5, 10**-3, 10**-1, 10**1, 10**3]
+#    list_ein = []
+#    for cc in list_C:
+#        poly_svm = SVC(kernel="poly", C=cc, gamma="auto", max_iter=100000000)
+#        poly_svm.fit(x_train, y_train)
+#        Ein = error(poly_svm, x_train, y_train)
+#        Eout = error(poly_svm, x_test, y_test)
+#        list_ein.append(Ein)
+#        print("C = {}: Ein = {}, Eout = {}".format(cc, Ein, Eout))
+#        plot_decision_region(np.array(x_train), np.array(y_train), poly_svm)
+#    plt.xscale("log")
+#    plt.xlim(left=list_C[0], right=list_C[-1])
+#    plt.xlabel("logC")
+#    plt.ylabel("Ein")
+#    plt.plot(list_C, list_ein)
+
+    # Q15
+    target = 0
+    x_train, y_train = get_XY(file_data, target)
+    x_test, y_test = get_XY(file_data, target)
+    list_C = [10**-2, 10**-1, 10**0, 10**1, 10**2]
+    list_d = []
     for cc in list_C:
-        linear_svm = LinearSVC(C=cc, max_iter=100000)
-        linear_svm.fit(x_train, y_train)
-        Ein = error(linear_svm, x_train, y_train)
-        Eout = error(linear_svm, x_test, y_test)
-        array_w = np.round(linear_svm.coef_, 5)
-        list_norm_w.append(round(np.linalg.norm(array_w), 5))
-        print("C = {}: ||w|| = {}, Ein = {}, Eout = {}".format(cc, list_norm_w[-1], Ein, Eout))
+        rbf_svm = SVC(kernel="rbf", C=cc, gamma=80, max_iter=100000000)
+        rbf_svm.fit(x_train, y_train)
+        Ein = error(rbf_svm, x_train, y_train)
+        Eout = error(rbf_svm, x_test, y_test)
+        index = 0
+        for ii in range((rbf_svm.support_).size):
+            if abs(rbf_svm.dual_coef_[0][ii]) < cc: # free SV
+                index = rbf_svm.support_[ii]
+                break
+        distance = round(abs(rbf_svm.decision_function(x_train[index].reshape(-1, x_train[index].shape[0]))[0]), 5)
+        list_d.append(distance)
+        print("C = {}: Ein = {}, Eout = {}, distance = {}".format(cc, Ein, Eout, distance))
+#        plot_decision_region(np.array(x_train), np.array(y_train), rbf_svm)
     plt.xscale("log")
     plt.xlim(left=list_C[0], right=list_C[-1])
+    plt.ylim(top=max(list_d)+0.1, bottom=min(list_d)-0.1)
     plt.xlabel("logC")
-    plt.ylabel("||w||")
-    plt.plot(list_C, list_norm_w)
+    plt.ylabel("distance")
+    plt.plot(list_C, list_d)
 
 #    kf = KFold(n_splits=5, random_state=123)
 #    for index_train, index_val in kf.split(list_t_train):
