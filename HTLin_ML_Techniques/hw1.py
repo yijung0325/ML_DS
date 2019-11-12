@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 import matplotlib.pyplot as plt
 from sklearn.svm import SVC
-#from sklearn.svm import LinearSVC
-#from sklearn.model_selection import KFold
-#from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split
 import numpy as np
+import multiprocessing as mp
 
 def plot_decision_region(X, y, classifier):
     markers = ('x', 'o')
@@ -142,42 +141,80 @@ def main():
 #    plt.ylabel("Ein")
 #    plt.plot(list_C, list_ein)
 
-    # Q15
+    # Q15 - Q16
     target = 0
     x_train, y_train = get_XY(file_data, target)
     x_test, y_test = get_XY(file_data, target)
-    list_C = [10**-2, 10**-1, 10**0, 10**1, 10**2]
-    list_d = []
-    for cc in list_C:
-        rbf_svm = SVC(kernel="rbf", C=cc, gamma=80, max_iter=100000000)
-        rbf_svm.fit(x_train, y_train)
-        Ein = error(rbf_svm, x_train, y_train)
-        Eout = error(rbf_svm, x_test, y_test)
-        index = 0
-        for ii in range((rbf_svm.support_).size):
-            if abs(rbf_svm.dual_coef_[0][ii]) < cc: # free SV
-                index = rbf_svm.support_[ii]
-                break
-        distance = round(abs(rbf_svm.decision_function(x_train[index].reshape(-1, x_train[index].shape[0]))[0]), 5)
-        list_d.append(distance)
-        print("C = {}: Ein = {}, Eout = {}, distance = {}".format(cc, Ein, Eout, distance))
+
+    # Q15
+#    list_C = [10**-2, 10**-1, 10**0, 10**1, 10**2]
+#    list_d = []
+#    for cc in list_C:
+#        rbf_svm = SVC(kernel="rbf", C=cc, gamma=80, max_iter=100000000)
+#        rbf_svm.fit(x_train, y_train)
+#        Ein = error(rbf_svm, x_train, y_train)
+#        Eout = error(rbf_svm, x_test, y_test)
+#        index = 0
+#        for ii in range((rbf_svm.support_).size):
+#            if abs(rbf_svm.dual_coef_[0][ii]) < cc: # free SV
+#                index = rbf_svm.support_[ii]
+#                break
+#        distance = round(abs(rbf_svm.decision_function(x_train[index].reshape(-1, x_train[index].shape[0]))[0]), 5)
+#        list_d.append(distance)
+#        print("C = {}: Ein = {}, Eout = {}, distance = {}".format(cc, Ein, Eout, distance))
 #        plot_decision_region(np.array(x_train), np.array(y_train), rbf_svm)
-    plt.xscale("log")
-    plt.xlim(left=list_C[0], right=list_C[-1])
-    plt.ylim(top=max(list_d)+0.1, bottom=min(list_d)-0.1)
-    plt.xlabel("logC")
-    plt.ylabel("distance")
-    plt.plot(list_C, list_d)
+#    plt.xscale("log")
+#    plt.xlim(left=list_C[0], right=list_C[-1])
+#    plt.ylim(top=max(list_d)+0.1, bottom=min(list_d)-0.1)
+#    plt.xlabel("logC")
+#    plt.ylabel("distance")
+#    plt.plot(list_C, list_d)
 
-#    kf = KFold(n_splits=5, random_state=123)
-#    for index_train, index_val in kf.split(list_t_train):
-#        print("Train: {}, Validate: {}".format(index_train, index_val))
-
-
-#    x_train, x_val, y_train, y_val =  train_test_split(x_train, y_train, test_size = 0.2)
-
-    
+    # Q16
+    num_exp = 100
+    size_val = 1000
+    cc = 0.1
+    list_gamma = [-2, -1, 0, 1, 2]
+    hist_e = {}
+    hist_e["Ein"] = [0, 0, 0, 0, 0]
+    hist_e["Eval"] = [0, 0, 0, 0, 0]
+    hist_e["Eout"] = [0, 0, 0, 0, 0]
+    pool = mp.Pool(processes=mp.cpu_count())
+    for nn in range(num_exp):
+        xx_train, xx_val, yy_train, yy_val =  train_test_split(x_train, y_train, test_size = size_val/y_train.size)
+        results = [pool.apply_async(q16_exp, args=(xx_train, xx_val, yy_train, yy_val, x_test, y_test, cc, 10**list_gamma[gg])) for gg in range(len(list_gamma))]
+        array_e = np.array([p.get() for p in results])
+        array_ein = array_e[:, 0]
+        array_eval = array_e[:, 1]
+        array_eout = array_e[:, 2]
+        hist_e["Ein"][np.argmin(array_ein)] += 1
+        hist_e["Eval"][np.argmin(array_eval)] += 1
+        hist_e["Eout"][np.argmin(array_eout)] += 1
+        print("exp {}:".format(nn))
+        print("Ein = {}".format(array_ein))
+        print("Eval = {}".format(array_eval))
+        print("Eout = {}".format(array_eout))
+        print("==========")
+    pool.close()
+    plt.xlim(left=list_gamma[0]-1, right=list_gamma[-1]+1)
+    plt.ylim(top=max(hist_e["Eval"])*1.1)
+    plt.xlabel("logGamma")
+    plt.ylabel("histogram of min E")
+    array_gamma = np.array(list_gamma)
+    plt.xticks(array_gamma)
+    plt.bar(x=array_gamma-0.3, width=0.3, height=hist_e["Ein"], label="Ein", color='r')
+    plt.bar(x=array_gamma    , width=0.3, height=hist_e["Eval"], label="Eval", color='g')
+    plt.bar(x=array_gamma+0.3, width=0.3, height=hist_e["Eout"], label="Eout", color='b')
+    plt.legend()
     return
+
+def q16_exp(xx_train, xx_val, yy_train, yy_val, x_test, y_test, cc, gg):
+    rbf_svm = SVC(kernel="rbf", C=cc, gamma=gg, max_iter=100000)
+    rbf_svm.fit(xx_train, yy_train)
+    Ein = error(rbf_svm, xx_train, yy_train)
+    Eval = error(rbf_svm, xx_val, yy_val)
+    Eout = error(rbf_svm, x_test, y_test)
+    return Ein, Eval, Eout
 
 if __name__ == "__main__":
     main()
