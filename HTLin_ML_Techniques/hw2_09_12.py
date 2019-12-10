@@ -20,21 +20,24 @@ def main():
         x_train, y_train = load_xy(list_line[:size_train])
         x_test, y_test = load_xy(list_line[size_train:])
     list_lambda = [0.05, 0.5, 5, 50, 500]
-    ein = []
-    eout = []
 
     # Q9, Q10: run regression
-    # for lam in list_lambda:
-    #     rcf = RidgeClassifier(alpha=lam)
-    #     rcf.fit(x_train, y_train)
-    #     Ein = 1-rcf.score(x_train, y_train)
-    #     Eout = 1-rcf.score(x_test, y_test)
-    #     ein.append(Ein)
-    #     eout.append(Eout)
-    # print("argminEin = {}, minEin_lambda = {}".format(min(ein), list_lambda[ein.index(min(ein))]))
-    # print("argminEout = {}, minEout_lambda = {}".format(min(eout), list_lambda[eout.index(min(eout))]))
-    
+    ein = []
+    eout = []
+    for lam in list_lambda:
+        rcf = RidgeClassifier(alpha=lam)
+        rcf.fit(x_train, y_train)
+        Ein = 1-rcf.score(x_train, y_train)
+        Eout = 1-rcf.score(x_test, y_test)
+        ein.append(Ein)
+        eout.append(Eout)
+    print("Ridge Classifier:")
+    print("argminEin = {}, minEin_lambda = {}".format(min(ein), list_lambda[ein.index(min(ein))]))
+    print("argminEout = {}, minEout_lambda = {}".format(min(eout), list_lambda[eout.index(min(eout))]))
+    print("==========")
     # Q11, Q12: Bagging
+    ein.clear()
+    eout.clear()
     num_iter = 250
     for lam in list_lambda:
         rcf = RidgeClassifier(alpha=lam)
@@ -44,6 +47,7 @@ def main():
         Eout = 1-bcf.score(x_test, y_test)
         ein.append(Ein)
         eout.append(Eout)
+    print("Bagging Ridge Classifier:")
     print("argminEin = {}, minEin_lambda = {}".format(min(ein), list_lambda[ein.index(min(ein))]))
     print("argminEout = {}, minEout_lambda = {}".format(min(eout), list_lambda[eout.index(min(eout))]))
 
