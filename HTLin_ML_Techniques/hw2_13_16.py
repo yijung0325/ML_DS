@@ -53,7 +53,6 @@ def main():
             list_gs.append(DECISION_STUMP(ss, ii, 0, xy_train[ii, :, 0]))
             for nn in range(1, xy_train.shape[1]): # the index of an interval
                 list_gs.append(DECISION_STUMP(ss, ii, nn, xy_train[ii, :, 0]))
-#    list_u = [1/xy_train.shape[1]]*xy_train.shape[1]
     array_u = np.full(xy_train.shape[1], 1/xy_train.shape[1])
     # Q13
     pool = mp.Pool(processes=mp.cpu_count())
@@ -65,27 +64,14 @@ def main():
                 ii = 0
             else:
                 ii = 1
-#            Ein = list_gs[gg].get_err(xy_train[ii, :, 1], array_u)
             results.append(pool.apply_async(list_gs[gg].get_err, args=(xy_train[ii, :, 1], array_u)))
         ein_ei = np.array([rr.get() for rr in results])
-        print(0)
-#        Ein = ein_ei
-#        id_gs = list_ein.index(Ein)
 #    print("Ein = {}, gt(s, i, theta) = ({}, {}, {})".format(round(Ein, 5), list_gs[id_gs].ss, list_gs[id_gs].ii, list_gs[id_gs].theta))
 #        list_gtein.append(min(list_ein))
 #        gt = list_gs[list_gs.index(list_gtein[-1])]
         
     pool.close()
-#    for tt in range(1, num_iter+1):
-#        pool.apply_async(AdaBoostClassifier(base_estimator=dcf, n_estimators=tt))
 
-    # list_ein = []
-    # for tt in range(1, num_iter+1):
-    #     dcf = DecisionTreeClassifier(max_depth=1)
-    #     abcf = AdaBoostClassifier(base_estimator=dcf, n_estimators=tt)
-    #     abcf.fit(x_train, y_train)
-    #     Ein = 1-abcf.score(x_train, y_train)
-    #     list_ein.append(Ein)
     # plt.xlabel("t")
     # plt.ylabel("Ein")
     # plt.plot(list(range(1, num_iter+1)), list_ein)
