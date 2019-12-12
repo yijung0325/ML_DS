@@ -1,28 +1,30 @@
 # https://scikit-learn.org/stable/auto_examples/ensemble/plot_adaboost_twoclass.html
 
-import matplotlib.pyplot as plt
+import numpy as np
 import multiprocessing as mp
+#import math
+#import matplotlib.pyplot as plt
 
 class DECISION_STUMP:
-    def __init__(self, ss, ii, list_x, nn, size):
+    def __init__(self, ss, ii, nn, array_x):
         self.ss = ss
         self.ii = ii
         if nn == 0:
-            self.theta = 0
-        elif nn == size:
-            self.theta = 1
+            self.theta = array_x[0]/2
         else:
-            self.theta = (list_x[nn-1]+list_x[nn])/2
+            self.theta = (array_x[nn-1]+array_x[nn])/2
         self.list_yhat = [-ss]*nn
-        self.list_yhat.extend([ss]*(size-nn))
+        self.list_yhat.extend([ss]*(array_x.size-nn))
 
     def get_err(self, list_y, list_u):
         error = 0
-        for pp in range(len(list_y)):
-            if list_y[pp] != self.list_yhat[pp]:
-                error += list_u[pp]
+        list_ei = [] # error index
+        for ee in range(len(list_y)):
+            if list_y[ee] != self.list_yhat[ee]:
+                error += list_u[ee]
+                list_ei.append(ee)
         error /= sum(list_u)
-        return error
+        return error, list_ei
 
 def load_xy(list_line):
     x = [] # with feature(s)
@@ -36,18 +38,10 @@ def load_xy(list_line):
     for ii in range(len(x[0])):
         list_xy = []
         for jj in range(len(y)):
-            list_xy.append((x[jj], y[jj]))
-        list_xy = sorted(list_xy, key=lambda xy: xy[0][ii])
+            list_xy.append([x[jj][ii], y[jj][0], y[jj][1]])
+        list_xy = sorted(list_xy, key=lambda xy: xy[0])
         matrix_xy.append(list_xy)
-    return matrix_xy
-
-def decision_stump(list_y, list_yhat, list_u):
-    Ein = 0
-    for pp in range(len(list_y)):
-        if list_yhat[pp] != list_y[pp]:
-            Ein += list_u[pp]
-    Ein /= sum(list_u)
-    return Ein
+    return np.array(matrix_xy)
 
 def main():
     # load data
@@ -56,19 +50,37 @@ def main():
     with open(file_data, 'r') as fr:
         list_line = fr.readlines()
         xy_train = load_xy(list_line)
-    num_iter = 300
-
+    num_iter = 1
+    # initiate
+    list_gs = []
+    for ii in range(xy_train.shape[0]): # the feature index
+        for ss in range(-1, 2, 2): # the sign of a decision stump: -1 or 1
+            list_gs.append(DECISION_STUMP(ss, ii, 0, xy_train[ii, :, 0]))
+            for nn in range(1, xy_train.shape[1]): # the index of an interval
+                list_gs.append(DECISION_STUMP(ss, ii, nn, xy_train[ii, :, 0]))
+    list_u = [1/xy_train.shape[1]]*xy_train.shape[1]
     # Q13
-    list_u = [1/len(xy_train[0])]*len(xy_train[0])
-    list_s = [-1, 1]
-    list_gt = []
     pool = mp.Pool(processes=mp.cpu_count())
+    results = []
+    list_gtein = []
     for tt in range(num_iter):
         list_ein = []
+        for gg in range(len(list_gs)):
+            if gg < len(list_gs)/2:
+                ii = 0
+            else:
+                ii = 1
+#            print("gg = {}".format(gg))
+            Ein, list_ee = list_gs[gg].get_err(xy_train[ii, :, 1], list_u)
+            list_ein.append(Ein)
+    Ein = min(list_ein)
+    id_gs = list_ein.index(Ein)
+    print("Ein = {}, gt(s, i, theta) = ({}, {}, {})".format(round(Ein, 5), list_gs[id_gs].ss, list_gs[id_gs].ii, list_gs[id_gs].theta))
+#            results.append(pool.apply_async(list_gs[gg].get_err(xy_train[ii, :, 1], list_u)))
+#        list_ein = [rr.get() for rr in results]
+#        list_gtein.append(min(list_ein))
+#        gt = list_gs[list_gs.index(list_gtein[-1])]
         
-        
-        
-        decision_stump(xy_train, list_u)
     pool.close()
 #    for tt in range(1, num_iter+1):
 #        pool.apply_async(AdaBoostClassifier(base_estimator=dcf, n_estimators=tt))
@@ -80,10 +92,10 @@ def main():
     #     abcf.fit(x_train, y_train)
     #     Ein = 1-abcf.score(x_train, y_train)
     #     list_ein.append(Ein)
-    plt.xlabel("t")
-    plt.ylabel("Ein")
-    plt.plot(list(range(1, num_iter+1)), list_ein)
-    plt.savefig("t_ein.png")
+    # plt.xlabel("t")
+    # plt.ylabel("Ein")
+    # plt.plot(list(range(1, num_iter+1)), list_ein)
+    # plt.savefig("t_ein.png")
         
     file_data = "hw2_adaboost_test.dat"
     xy_test = None
