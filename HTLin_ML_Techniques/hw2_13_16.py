@@ -13,18 +13,13 @@ class DECISION_STUMP:
             self.theta = array_x[0]/2
         else:
             self.theta = (array_x[nn-1]+array_x[nn])/2
-        self.list_yhat = [-ss]*nn
-        self.list_yhat.extend([ss]*(array_x.size-nn))
+        self.array_yhat = np.array([-ss]*nn)
+        self.array_yhat = np.append(self.array_yhat, [ss]*(array_x.size-nn))
 
-    def get_err(self, list_y, list_u):
-        error = 0
-        list_ei = [] # error index
-        for ee in range(len(list_y)):
-            if list_y[ee] != self.list_yhat[ee]:
-                error += list_u[ee]
-                list_ei.append(ee)
-        error /= sum(list_u)
-        return error, list_ei
+    def get_err(self, array_y, array_u):
+        array_e = (array_y != self.array_yhat)
+        error = np.sum(array_u[array_e])/np.sum(array_u)
+        return [error, array_e]
 
 def load_xy(list_line):
     x = [] # with feature(s)
@@ -58,26 +53,25 @@ def main():
             list_gs.append(DECISION_STUMP(ss, ii, 0, xy_train[ii, :, 0]))
             for nn in range(1, xy_train.shape[1]): # the index of an interval
                 list_gs.append(DECISION_STUMP(ss, ii, nn, xy_train[ii, :, 0]))
-    list_u = [1/xy_train.shape[1]]*xy_train.shape[1]
+#    list_u = [1/xy_train.shape[1]]*xy_train.shape[1]
+    array_u = np.full(xy_train.shape[1], 1/xy_train.shape[1])
     # Q13
     pool = mp.Pool(processes=mp.cpu_count())
-    results = []
     list_gtein = []
+    results = []
     for tt in range(num_iter):
-        list_ein = []
         for gg in range(len(list_gs)):
             if gg < len(list_gs)/2:
                 ii = 0
             else:
                 ii = 1
-#            print("gg = {}".format(gg))
-            Ein, list_ee = list_gs[gg].get_err(xy_train[ii, :, 1], list_u)
-            list_ein.append(Ein)
-    Ein = min(list_ein)
-    id_gs = list_ein.index(Ein)
-    print("Ein = {}, gt(s, i, theta) = ({}, {}, {})".format(round(Ein, 5), list_gs[id_gs].ss, list_gs[id_gs].ii, list_gs[id_gs].theta))
-#            results.append(pool.apply_async(list_gs[gg].get_err(xy_train[ii, :, 1], list_u)))
-#        list_ein = [rr.get() for rr in results]
+#            Ein = list_gs[gg].get_err(xy_train[ii, :, 1], array_u)
+            results.append(pool.apply_async(list_gs[gg].get_err, args=(xy_train[ii, :, 1], array_u)))
+        ein_ei = np.array([rr.get() for rr in results])
+        print(0)
+#        Ein = ein_ei
+#        id_gs = list_ein.index(Ein)
+#    print("Ein = {}, gt(s, i, theta) = ({}, {}, {})".format(round(Ein, 5), list_gs[id_gs].ss, list_gs[id_gs].ii, list_gs[id_gs].theta))
 #        list_gtein.append(min(list_ein))
 #        gt = list_gs[list_gs.index(list_gtein[-1])]
         
