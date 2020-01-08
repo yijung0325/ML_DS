@@ -17,9 +17,9 @@ class DECISION_STUMP:
         self.array_yhat = self.array_yhat.astype(int)
 
     def get_ein(self, array_y, array_id, array_u):
-        array_e = array_id[array_y != self.array_yhat]
-        error = np.sum(array_u[array_e])/np.sum(array_u)
-        return [error, array_e]
+        array_eid = array_id[array_y != self.array_yhat] # the indices of errors
+        Ein = np.sum(array_u[array_eid])/np.sum(array_u)
+        return [Ein, array_eid]
 
     def classify(self, xx):
         if xx >= self.theta:
@@ -57,7 +57,13 @@ def main():
     with open(file_data, 'r') as fr:
         list_line = fr.readlines()
         xy_train = load_xy(list_line)
+    file_data = "hw2_adaboost_test.dat"
+    xy_test = None
+    with open(file_data, 'r') as fr:
+        list_line = fr.readlines()
+        xy_test = load_xy(list_line)
     num_iter = 300
+
     # initiate
     list_ds = [] # all possible decision stumps
     for ii in range(xy_train.shape[0]): # the feature index
@@ -66,16 +72,17 @@ def main():
             for nn in range(1, xy_train.shape[2]): # the index of an interval
                 list_ds.append(DECISION_STUMP(ss, ii, nn, xy_train[ii][0]))
     array_u = np.full(xy_train.shape[2], 1/xy_train.shape[2])
-    array_decision = np.zeros(xy_train.shape[2]) # for each data points, record their decision during each iteration
+    array_decision_Gt_in = np.zeros(xy_train.shape[2]) # for each data points, record their decision during each iteration
+    array_decision_Gt_out = np.zeros(xy_test.shape[2]) # for each data points, record their decision during each iteration
     # run
     pool = mp.Pool(processes=mp.cpu_count())
-    list_ein_gt = []
-    list_ein_Gt = []
+    list_ein_gt = [] # Q13
+    list_ein_Gt = [] # Q14
+    list_ut = [1] # Q15
+    list_eout_Gt = [] # Q16
     list_alpha = []
     list_gt_index = []
     for tt in range(num_iter):
-        print(tt)
-        
         results = []
         for gg in range(len(list_ds)):
             if gg < len(list_ds)/2:
@@ -83,36 +90,54 @@ def main():
             else:
                 ii = 1
             results.append(pool.apply_async(list_ds[gg].get_ein, args=(xy_train[ii][1].astype(int), xy_train[ii][2].astype(int), array_u)))
-        ein_id = np.transpose([rr.get() for rr in results])
+        ein_eid = np.transpose([rr.get() for rr in results])
         # update array_u
-        Ein_gt = np.min(ein_id[0])
-        gt_index = np.argmin(ein_id[0])
+        Ein_gt = np.min(ein_eid[0])
+        gt_index = np.argmin(ein_eid[0])
         factor = ((1-Ein_gt)/Ein_gt)**0.5
-        array_index = np.sort(ein_id[1][gt_index])
+        array_eid = np.sort(ein_eid[1][gt_index])
         pp = 0
         for ii in range(array_u.size):
-            if pp<array_index.size and ii==array_index[pp]: # error
+            if pp<array_eid.size and ii==array_eid[pp]: # error
                 array_u[ii] *= factor
                 pp += 1
             else:
                 array_u[ii] /= factor
         # dump results
         list_ein_gt.append(Ein_gt)
+        list_ut.append(np.sum(array_u))
         list_alpha.append(math.log(factor))
         list_gt_index.append(gt_index)
+        # calculate Gt_in
         results = []
+        gt = list_ds[gt_index]
         for xx in range(xy_train.shape[2]):
-            gt = list_ds[list_gt_index[-1]]
             results.append(pool.apply_async(gt.classify, args=(xy_train[gt.ii][0][xx], )))
-        array_result = np.array([rr.get() for rr in results])*list_alpha[-1]
-        for rr in xy_train[gt.ii][2].astype(int):
-            array_decision[rr] += array_result[rr]
+        array_decision_gt = np.array([rr.get() for rr in results])
+        for rr in range(array_decision_gt.size):
+            index_original = xy_train[gt.ii][2][rr].astype(int)
+            array_decision_Gt_in[index_original] += array_decision_gt[rr]*list_alpha[-1]
         # calculate Ein(Gt)
         array_yid = xy_train[gt.ii][1:]
         array_y = array_yid[0][np.argsort(array_yid[1])]
-        array_result = array_decision*array_y
+        array_result = array_decision_Gt_in*array_y
         Ein_Gt = (array_result[array_result < 0]).size/xy_train.shape[2]
         list_ein_Gt.append(Ein_Gt)
+        # calculate Gt_out
+        results = []
+        for xx in range(xy_test.shape[2]):
+            results.append(pool.apply_async(gt.classify, args=(xy_test[gt.ii][0][xx], )))
+        array_decision_gt = np.array([rr.get() for rr in results])
+        for rr in range(array_decision_gt.size):
+            index_original = xy_test[gt.ii][2][rr].astype(int)
+            array_decision_Gt_out[index_original] += array_decision_gt[rr]*list_alpha[-1]
+        # calculate Eout(Gt)
+        array_yid = xy_test[gt.ii][1:]
+        array_y = array_yid[0][np.argsort(array_yid[1])]
+        array_result = array_decision_Gt_out*array_y
+        Eout_Gt = (array_result[array_result < 0]).size/xy_test.shape[2]
+        list_eout_Gt.append(Eout_Gt)
+        print("{} {} {} {} {}".format(tt, round(Ein_gt, 5), Ein_Gt, round(list_ut[-2], 5), Eout_Gt))
     pool.close()
 
     # Q13
@@ -122,18 +147,26 @@ def main():
     # plt.plot(list(range(num_iter)), list_ein_gt)
     # plt.savefig("Ein_gt.png")
 
-    # Q14        
-    print("Ein(GT) = {}".format(list_ein_Gt[-1]))
-    plt.xlabel("t")
-    plt.ylabel("Ein(Gt)")
-    plt.plot(list(range(num_iter)), list_ein_Gt)
-    plt.savefig("Ein_Gt.png")
+    # Q14
+    # print("Ein(GT) = {}".format(list_ein_Gt[-1]))
+    # plt.xlabel("t")
+    # plt.ylabel("Ein(Gt)")
+    # plt.plot(list(range(num_iter)), list_ein_Gt)
+    # plt.savefig("Ein_Gt.png")
 
-    # file_data = "hw2_adaboost_test.dat"
-    # xy_test = None
-    # with open(file_data, 'r') as fr:
-    #     list_line = fr.readlines()
-    #     xy_test = load_xy(list_line)
+    # Q15
+    # print("UT = {}".format(list_ut[-2]))
+    # plt.xlabel("t")
+    # plt.ylabel("Ut")
+    # plt.plot(list(range(num_iter)), list_ut[:-1])
+    # plt.savefig("Ut.png")
+
+    # Q16
+    print("Eout(GT) = {}".format(list_eout_Gt[-1]))
+    plt.xlabel("t")
+    plt.ylabel("Eout(Gt)")
+    plt.plot(list(range(num_iter)), list_eout_Gt)
+    plt.savefig("Eout_Gt.png")
     
     
     return
