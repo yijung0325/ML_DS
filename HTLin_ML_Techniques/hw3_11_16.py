@@ -2,7 +2,7 @@
 
 import numpy as np
 import multiprocessing as mp
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 class DECISION_STUMP:
     def __init__(self, ss, nn):
@@ -35,30 +35,27 @@ class DECISION_TREE:
         self.ds_theta = 0 # theta
         self.ds_ss = 0 # s
         if xy.size > 0:
-            self.train(xy)
+            self.fit(xy)
 
-    def train(self, xy):
-        # sort the data by features
-        num_features = xy.shape[0]-1
-        sorted_xy = np.zeros((num_features, xy.shape[0], xy.shape[1]))
-        list_ds = []
-        data_size = xy.shape[1]
-        for ff in range(num_features):
-            sorted_xy[ff] = xy[:, xy[ff].argsort()]
+    def fit(self, xy):
         # initialize decision stumps
+        data_size = xy.shape[0]
+        list_ds = []
         for ss in range(-1, 2, 2): # the sign of a decision stump: -1 or 1
             list_ds.append(DECISION_STUMP(ss, 0))
             for nn in range(1, data_size):
                 list_ds.append(DECISION_STUMP(ss, nn))
         # train
-        pool = mp.Pool(processes=mp.cpu_count())
+        num_features = xy.shape[1]-1
+        sorted_xy = np.zeros((num_features, xy.shape[0], xy.shape[1]))
         min_ein = data_size*10
         min_eid = 0
         target_nn = 0
         for ff in range(num_features):
-            sorted_xy[ff] = xy[:, xy[ff].argsort()]
-            result = [pool.apply_async(list_ds[dd].get_gi, args=(sorted_xy[ff][-1], )) for dd in range(len(list_ds))]
-            list_gid = [rr.get() for rr in result]
+            sorted_xy[ff] = xy[xy[:, ff].argsort()]
+            list_gid = []
+            for ds in list_ds:
+                list_gid.append(ds.get_gi(sorted_xy[ff][:, -1]))
             ein = min(list_gid)
             if ein < min_ein:
                 min_ein = ein
@@ -66,27 +63,36 @@ class DECISION_TREE:
                 self.ds_ss = list_ds[min_eid].ss
                 self.ds_ff = ff
                 target_nn = list_ds[min_eid].nn
-        pool.close()
         # update
         if target_nn == 0:
-            self.ds_theta = (self.lb+sorted_xy[self.ds_ff][self.ds_ff][0])/2
+            self.ds_theta = (self.lb+sorted_xy[self.ds_ff][0][self.ds_ff])/2
         else:
-            self.ds_theta = (sorted_xy[self.ds_ff][self.ds_ff][target_nn-1]+sorted_xy[self.ds_ff][self.ds_ff][target_nn])/2
+            self.ds_theta = (sorted_xy[self.ds_ff][target_nn-1][self.ds_ff]+sorted_xy[self.ds_ff][target_nn][self.ds_ff])/2
             if self.max_height > self.height:
                 # left
-                xy_leaf = sorted_xy[self.ds_ff][:, :target_nn]
-                self.add(DECISION_TREE(self.max_height, self.height+1, self.lb, sorted_xy[self.ds_ff][self.ds_ff][target_nn], xy_leaf))
+                xy_leaf = sorted_xy[self.ds_ff][:target_nn]
+                self.add(DECISION_TREE(self.max_height, self.height+1, self.lb, sorted_xy[self.ds_ff][target_nn][self.ds_ff], xy_leaf))
                 # right
-                xy_leaf = sorted_xy[self.ds_ff][:, target_nn:]
-                self.add(DECISION_TREE(self.max_height, self.height+1, sorted_xy[self.ds_ff][self.ds_ff][target_nn-1], self.rb, xy_leaf))
+                xy_leaf = sorted_xy[self.ds_ff][target_nn:]
+                self.add(DECISION_TREE(self.max_height, self.height+1, sorted_xy[self.ds_ff][target_nn-1][self.ds_ff], self.rb, xy_leaf))
         
     def add(self, dtree):
         if not bool(self.left):
-#            print("add left, height = {}".format(dtree.height))
             self.left = dtree
         elif not bool(self.right):
-#            print("add right, height = {}".format(dtree.height))
             self.right = dtree
+
+    def predict(self, xx):
+        if xx[self.ds_ff] <= self.ds_theta:
+            if bool(self.left):
+                return self.left.predict(xx)
+            else:
+                return -self.ds_ss
+        else:
+            if bool(self.right):
+                return self.right.predict(xx)
+            else:
+                return self.ds_ss
 
 def traverse(dtree):
     queue = [dtree]
@@ -109,7 +115,15 @@ def load_xy(list_line):
         list_xy = list(map(float, data[:-1])) # x
         list_xy.append(int(data[-1]))
         matrix_xy.append(list_xy)
-    return np.transpose(np.array(matrix_xy))
+    return np.array(matrix_xy)
+
+def get_err(xy, dtree):
+    error = 0
+    for xxyy in xy:
+        if xxyy[-1] != dtree.predict(xxyy[:2]):
+            error += 1
+    error /= xy.shape[0]
+    return error
 
 def main():
     # load data
@@ -118,13 +132,71 @@ def main():
     with open(file_data, 'r') as fr:
         list_line = fr.readlines()
         xy_train = load_xy(list_line)
-
-    dtree = DECISION_TREE(100, 1, 0, 1, xy_train)
-    traverse(dtree)
-            
-
-
     file_data = "hw3_test.dat"
+    xy_test = None
+    with open(file_data, 'r') as fr:
+        list_line = fr.readlines()
+        xy_test = load_xy(list_line)
+    
+    # Q11
+#    dtree = DECISION_TREE(xy_train.size, 1, 0, 1, xy_train)
+#    traverse(dtree)
+
+    # Q12
+    # Ein = 0
+    # for xy in xy_train:
+    #     if xy[-1] != dtree.predict(xy[:2]):
+    #         Ein += 1
+    # Ein /= xy_train.shape[0]
+    # Eout = 0
+    # for xy in xy_test:
+    #     if xy[-1] != dtree.predict(xy[:2]):
+    #         Eout += 1
+    # Eout /= xy_test.shape[0]
+    # print("Ein = {}, Eout = {}".format(Ein, Eout))
+
+    # Q13
+    # list_height = [1, 2, 3, 4, 5]
+    # list_ein = []
+    # list_eout = []
+    # for hh in list_height:
+    #     dtree = DECISION_TREE(hh, 1, 0, 1, xy_train)
+    #     Ein = 0
+    #     for xy in xy_train:
+    #         if xy[-1] != dtree.predict(xy[:2]):
+    #             Ein += 1
+    #     Ein /= xy_train.shape[0]
+    #     list_ein.append(Ein)
+    #     Eout = 0
+    #     for xy in xy_test:
+    #         if xy[-1] != dtree.predict(xy[:2]):
+    #             Eout += 1
+    #     Eout /= xy_test.shape[0]
+    #     list_eout.append(Eout)
+    # plt.plot(list_height, list_ein, label="Ein")
+    # plt.plot(list_height, list_eout, label="Eout")
+    # plt.legend()
+    # plt.xlabel("height")
+    # plt.savefig("height_err.png")
+
+    # Q14
+    num_trees = 30000
+    ratio = 0.8
+    pool = mp.Pool(processes=mp.cpu_count())
+    list_xy_sub = []
+    for nn in range(num_trees):
+        list_xy_sub.append(xy_train[np.random.choice(xy_train.shape[0], int(xy_train.shape[0]*ratio), replace=False)])
+    list_result = [pool.apply_async(DECISION_TREE, args=(xy_sub.size, 1, 0, 1, xy_sub)) for xy_sub in list_xy_sub]
+    list_gt = [rr.get() for rr in list_result]
+    list_result = [pool.apply_async(get_err, args=(list_xy_sub[ii], list_gt[ii],)) for ii in range(len(list_gt))]
+    list_ein = [rr.get() for rr in list_result]
+    pool.close()
+    plt.hist(list_ein)
+    plt.xlabel("Ein")
+    plt.ylabel("histogram")
+    plt.savefig("hist_ein_bag.png")
+    
+
     
     return
 
