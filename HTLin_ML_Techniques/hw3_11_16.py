@@ -117,13 +117,33 @@ def load_xy(list_line):
         matrix_xy.append(list_xy)
     return np.array(matrix_xy)
 
-def get_err(xy, dtree):
-    error = 0
-    for xxyy in xy:
-        if xxyy[-1] != dtree.predict(xxyy[:2]):
-            error += 1
-    error /= xy.shape[0]
-    return error
+def get_yhat(xy, dtree):
+    array_yhat = np.zeros(xy.shape[0])
+    for ii in range(xy.shape[0]):
+        array_yhat[ii] = dtree.predict(xy[ii, :2])
+    return array_yhat
+
+def get_err(array_y, array_yhat):
+    return array_y[array_y != array_yhat].size/array_y.size
+
+def q1516_yhat(list_yhat):
+    matrix_yhat = np.array(list_yhat)
+    array_yhat = np.zeros(matrix_yhat.shape[1])
+    for ii in range(matrix_yhat.shape[1]):
+        unique, count = np.unique(matrix_yhat[:, ii], return_counts=True)
+        dict_count = dict(zip(unique, count))
+        if -1 in dict_count and 1 in dict_count:
+            if dict_count[1] > dict_count[-1]:
+                array_yhat[ii] = 1
+            elif dict_count[1] < dict_count[-1]:
+                array_yhat[ii] = -1
+            else:
+                array_yhat[ii] = 0
+        elif -1 not in dict_count:
+            array_yhat[ii] = 1
+        else: # elif 1 not in dict_count:
+            array_yhat[ii] = -1
+    return array_yhat
 
 def main():
     # load data
@@ -179,7 +199,7 @@ def main():
     # plt.xlabel("height")
     # plt.savefig("height_err.png")
 
-    # Q14
+    # Q14 - Q16
     num_trees = 30000
     ratio = 0.8
     pool = mp.Pool(processes=mp.cpu_count())
@@ -188,14 +208,41 @@ def main():
         list_xy_sub.append(xy_train[np.random.choice(xy_train.shape[0], int(xy_train.shape[0]*ratio), replace=False)])
     list_result = [pool.apply_async(DECISION_TREE, args=(xy_sub.size, 1, 0, 1, xy_sub)) for xy_sub in list_xy_sub]
     list_gt = [rr.get() for rr in list_result]
-    list_result = [pool.apply_async(get_err, args=(list_xy_sub[ii], list_gt[ii],)) for ii in range(len(list_gt))]
+    list_result = [pool.apply_async(get_yhat, args=(xy_train, list_gt[ii],)) for ii in range(len(list_gt))]
+    list_yhat = [rr.get() for rr in list_result]
+
+    # Q14
+#    list_result = [pool.apply_async(get_err, args=(xy_train[:, -1], list_yhat[ii],)) for ii in range(len(list_yhat))]
+#    list_ein = [rr.get() for rr in list_result]
+#    plt.hist(list_ein)
+#    plt.xlabel("Ein")
+#    plt.ylabel("histogram")
+#    plt.savefig("hist_ein_bag.png")
+
+    # Q15 - Q16
+    # Ein
+    list_result = [pool.apply_async(q1516_yhat, args=(list_yhat[:tt+1], )) for tt in range(num_trees)]
+    list_yhat_bag = [rr.get() for rr in list_result]
+    list_result = [pool.apply_async(get_err, args=(xy_train[:, -1], list_yhat_bag[ii],)) for ii in range(len(list_yhat))]
     list_ein = [rr.get() for rr in list_result]
+    # Eout
+    list_result = [pool.apply_async(get_yhat, args=(xy_test, list_gt[ii],)) for ii in range(len(list_gt))]
+    list_yhat = [rr.get() for rr in list_result]
+    list_result = [pool.apply_async(q1516_yhat, args=(list_yhat[:tt+1], )) for tt in range(num_trees)]
+    list_yhat_bag = [rr.get() for rr in list_result]
+    list_result = [pool.apply_async(get_err, args=(xy_test[:, -1], list_yhat_bag[ii],)) for ii in range(len(list_yhat))]
+    list_eout = [rr.get() for rr in list_result]
+    # plot
+    list_t = list(range(1, num_trees+1))
+    plt.plot(list_t, list_ein, label="Ein")
+    plt.plot(list_t, list_eout, label="Eout")
+    plt.legend()
+#    plt.xticks(list(range(1, num_trees+1, round(num_trees/20))))
+    plt.xlabel("t")
+    plt.ylabel("err rate")
+    plt.savefig("q1516.png")
+
     pool.close()
-    plt.hist(list_ein)
-    plt.xlabel("Ein")
-    plt.ylabel("histogram")
-    plt.savefig("hist_ein_bag.png")
-    
 
     
     return
