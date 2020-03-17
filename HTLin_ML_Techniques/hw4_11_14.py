@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 def yhat_uniform(x_data, x_train, y_train, gamma):
     result = 0
     for ii in range(x_data.shape[0]):
-        distance2 = np.linalg.norm(x_data - x_train[ii])
+        distance2 = (np.linalg.norm(x_data - x_train[ii]))**2
         result += y_train[ii]*math.exp(-gamma*distance2)
     if result >= 0:
         return 1
@@ -65,7 +65,7 @@ def main():
     # plt.savefig("ein_eout.png")
 
     # Q13, Q14
-    list_gamma = [0.001, 0.1, 1, 10, 100]
+    list_gamma = [0.001, 0.01, 0.1, 1, 10, 100]
     list_ein = []
     list_eout = []
     for gamma in list_gamma:
@@ -83,6 +83,7 @@ def main():
         list_eout.append(num_err/x_test.shape[0])
     plt.xlabel("Gamma")
     plt.ylabel("Error")
+    plt.xscale("log")
     plt.plot(list_gamma, list_ein, label="Ein")
     plt.plot(list_gamma, list_eout, label="Eout")
     plt.legend()
