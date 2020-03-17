@@ -1,10 +1,6 @@
-# https://bit.ly/379wq2t
-
 import numpy as np
-import math
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
-#import multiprocessing as mp
 
 def load_x(list_line):
     list_x = []
